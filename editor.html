@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Éditeur de personnage</title>
+<style>
+body{margin:0;background:#12141c;color:#dde;font:14px system-ui,sans-serif}
+header{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 12px;background:#1b2030}
+a{color:#7ee08a}input,button{font:inherit}
+button{background:#2c3550;color:#fff;border:1px solid #556;border-radius:5px;padding:4px 10px;cursor:pointer}
+button.on{background:#4aa3ff;color:#000}
+input[type=number],input[type=text]{background:#0d1018;color:#fff;border:1px solid #445;border-radius:4px;padding:3px 6px;width:90px}
+main{display:flex;gap:12px;padding:12px;flex-wrap:wrap}
+nav{width:190px;display:flex;flex-direction:column;gap:4px}nav h4{margin:10px 0 2px;color:#8aa0d0}nav button{text-align:left}
+section{flex:1;min-width:300px;max-width:720px}
+canvas{touch-action:none;width:100%;max-width:480px;background:#10131f;border-radius:8px;display:block}
+#form{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:6px 16px;margin-top:10px}
+label{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.box{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+small{color:#99a}
+</style></head><body>
+<header>
+ <a href="index.html">← Retour au jeu</a>
+ Nom : <input type="text" id="nm" style="width:160px">
+ <button id="ex">Exporter personnage.js</button><button id="im">Importer</button><button id="ra">Tout réinitialiser</button>
+ <input type="file" id="fi" accept=".js,.json" hidden>
+ <small>Brouillon enregistré automatiquement (recharge le jeu pour tester). Pour le publier : exporte <b>personnage.js</b> et remplace-le dans ton dépôt.</small>
+</header>
+<main>
+ <nav id="list"></nav>
+ <section>
+  <div id="pvw">
+   <canvas id="pv" width="480" height="300"></canvas>
+   <p><button id="pl">⏯ Lecture / pause</button> <input type="range" id="sl" min="0" max="10" value="0" style="width:230px;vertical-align:middle"> <small>(60 images = 1 seconde)</small></p>
+  </div>
+  <div id="form"></div>
+  <p><button id="rm">Réinitialiser cette attaque</button></p>
+ </section>
+</main>
+<script src="personnage.js"></script>
+<script src="chars.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const GROUPS={'Normales au sol':['jab','dash','ftilt','utilt','dtilt','fsmash','usmash','dsmash'],'Aériennes':['nair','fair','bair','uair','dair'],'Saisies et lancers':['grab','tf','tb','tu','td'],'Relevés':['getup','ledgeatk'],'Spéciaux (B)':['neuB','sideB','upB','downB']};
+const MF=[['s','Démarrage (images avant le coup)'],['a','Durée active (images)'],['e','Lag de fin (images)'],['d','Dégâts (%)'],['kb','Éjection de base',.5],['gr','Éjection selon le % adverse',.01],['ang','Angle d\'éjection (°, 90 = haut)'],['vx','Vitesse horizontale pendant le coup',.5],['vy','Impulsion verticale au début',.5],['rh','Répéter le coup toutes les N images (0 = une seule fois)'],['gs','Gravité pendant l\'attaque (× ; 0 = vol)',.1],['chmax','Charge max (images)'],['chd','Bonus de dégâts à pleine charge (×)',.1]];
+const PF=[['walk','Vitesse de marche',.1],['run','Vitesse de course',.1],['jump','Force du saut',.5],['ajump','Force du saut aérien',.5],['jumps','Nombre de sauts aériens',1],['gravity','Gravité',.05],['fall','Vitesse de chute max',.5],['fast','Chute rapide max',.5],['air','Vitesse de déplacement en l\'air',.1]];
+const FL=[['ch','Chargeable (smash)'],['sym','Zone des deux côtés'],['air','Attaque aérienne'],['rec','Utilisable une seule fois en l\'air (récupération)'],['nc','Non annulable sur un coup touché']];
+let CH=loadChar(),cur='jab',fr=0,play=true,li=0,ipv='fsmash';
+const OX=200,OY=235,SC=2.2;
+const PM=()=>CH.moves[cur==='_i'?ipv:cur];
+const PJ=[['t','Torse (penché)',-60,60],['c','Accroupi',0,30],['af','Bras avant',-200,380],['ab','Bras arrière',-200,380],['lf','Jambe avant',-200,380],['lb','Jambe arrière',-200,380],['rf','Poignet objet avant',-180,180],['rb','Poignet objet arrière',-180,180]];
+function setKey(m,t,pose){m.anim=m.anim||[];const o={};for(const k of PK)o[k]=Math.round((pose[k]||0)*10)/10;const i=m.anim.findIndex(q=>q.t===t),nk={t,pose:o};if(i>=0)m.anim[i]=nk;else m.anim.push(nk);m.anim.sort((a,b)=>a.t-b.t)}
+function setBoxKey(m,t,b){b=b.map(v=>Math.round(v));if(m.boxKeys&&m.boxKeys.length){const i=m.boxKeys.findIndex(k=>k.t===t);if(i>=0)m.boxKeys[i].box=b;else{m.boxKeys.push({t,box:b});m.boxKeys.sort((a,c)=>a.t-c.t)}}else m.box=b}
+function sync(){if(cur==='_p'||cur==='_i')return;const m=M(),po=animPose(m,fr),b=boxAt(m,fr);
+ document.querySelectorAll('[data-pj]').forEach(el=>{const v=Math.round(po[el.dataset.pj]||0);if(document.activeElement!==el)el.value=v;const o=document.querySelector('[data-po="'+el.dataset.pj+'"]');if(o)o.textContent=v});
+ const f=$('fn');if(f)f.textContent=fr;
+ document.querySelectorAll('[data-bn]').forEach(el=>{if(b&&document.activeElement!==el)el.value=Math.round(b[+el.dataset.bn])})}
+function moveForm(m){
+ const sh=FX_KINDS.filter(k=>k[0]!=='sheet'),ni=(f,v,at,st)=>`<input type="number" step="${st||1}" value="${v??''}" ${at} data-af="${f}" style="width:62px">`;
+ let h=`<div class="box"><b>Déplacements pendant l'attaque :</b> <button data-lx="amv">+ Changement de vitesse</button> <button data-lx="atp">+ Téléportation</button></div>`;
+ h+=(m.mv||[]).map((q,i)=>{const a=`data-ar="mv" data-ai="${i}"`;return `<div class="box">À l'image ${ni('t',q.t,a)} vitesse avant ${ni('vx',q.vx,a)} vitesse verticale ${ni('vy',q.vy,a)} <small>(vide = inchangée)</small> <button data-lx="rmv${i}">✕</button></div>`}).join('');
+ h+=(m.tp||[]).map((q,i)=>{const a=`data-ar="tp" data-ai="${i}"`;return `<div class="box">Téléportation à l'image ${ni('t',q.t,a)} avance de ${ni('dx',q.dx,a)} monte de ${ni('dy',q.dy,a)} <button data-lx="rtp${i}">✕</button></div>`}).join('');
+ h+=`<div class="box"><b>Projectiles :</b> <button data-lx="aproj">+ Projectile</button></div>`;
+ h+=(m.proj||[]).map((q,i)=>{const a=f=>`data-ar="proj" data-ai="${i}" data-af="${f}"`,n=(f,l,st)=>`<label>${l} <input type="number" step="${st||1}" value="${q[f]??''}" ${a(f)} style="width:62px"></label>`;
+  return `<div class="box" style="border:1px solid #334;padding:6px;border-radius:6px">${n('t','Image')}${n('x','X')}${n('y','Y')}${n('vx','Vitesse X',.5)}${n('vy','Vitesse Y',.5)}${n('g','Gravité',.05)}${n('life','Durée de vie')}${n('r','Taille')}${n('d','Dégâts')}${n('kb','Éjection',.5)}${n('gr','Éj. selon %',.01)}${n('ang','Angle')}${n('n','Nb de tirs')}${n('spread','Écart °')}${n('bounce','Rebonds')}${n('spin','Rotation')} <select ${a('shape')}>${sh.map(([id,l])=>`<option value="${id}" ${(q.shape||'burst')==id?'selected':''}>${l}</option>`).join('')}</select> <input type="color" value="${q.color||'#ff8c28'}" ${a('color')}> <input type="color" value="${q.color2||'#ffd24a'}" ${a('color2')}> ${q.shape==='image'?`<input type="file" accept="image/*" data-pimg="${i}" style="width:140px">`:''} <label><input type="checkbox" ${q.pierce?'checked':''} ${a('pierce')}> traverse</label> <button data-lx="rproj${i}">✕</button></div>`}).join('');
+ if(/^(neu|side|up|down)B$/.test(m.k)&&!CH.moves[m.k+'a'])h+=`<div class="box"><button data-lx="mkair">Créer une version aérienne de ce spécial</button> <small>(utilisée quand tu le lances en l'air)</small></div>`;
+ if(/^(neu|side|up|down)Ba$/.test(m.k))h+=`<div class="box"><button data-lx="rmair">Supprimer cette version aérienne</button></div>`;
+ return h}
+function pickProjImg(file,i){if(!file)return;const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,256/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);M().proj[i].img=c.toDataURL('image/png');save();draw()};im.src=r.result};r.readAsDataURL(file)}
+function itemsForm(){
+ let h=`<div class="box"><b>Ajouter un objet :</b> ${ITEM_PRESETS.map((p,i)=>`<button data-ia="${i}">${p.n}</button>`).join(' ')}</div>`;
+ h+=`<div class="box">Aperçu avec l'attaque : <select data-ipv="1">${Object.keys(CH.moves).map(k=>`<option value="${k}" ${k==ipv?'selected':''}>${CH.moves[k].n}</option>`).join('')}</select></div>`;
+ h+=CH.items.map((it,i)=>{const a=f=>`data-it="${i}" data-if="${f}"`,n=(f,l)=>`<label>${l} <input type="number" value="${it[f]??0}" ${a(f)} style="width:64px"></label>`,sel=(f,list)=>`<select ${a(f)}>${list.map(([id,l])=>`<option value="${id}" ${it[f]==id?'selected':''}>${l}</option>`).join('')}</select>`;
+  return `<div class="box" style="border:1px solid #334;padding:6px;border-radius:6px"><input type="text" value="${it.n||''}" ${a('n')} style="width:110px"> ${sel('kind',ITEM_KINDS)} ${sel('at',ITEM_AT)} ${n('len','Longueur')} ${n('w','Épaisseur')} ${n('rot','Rotation °')} ${n('ox','Décalage X')} ${n('oy','Décalage Y')} <input type="color" value="${it.color||'#cccccc'}" ${a('color')}> <input type="color" value="${it.color2||'#8a5a2b'}" ${a('color2')}> ${it.kind==='image'?`<input type="file" accept="image/*" data-iimg="${i}" style="width:150px">`:''} <label><input type="checkbox" ${it.show===0?'':'checked'} ${a('show')}> visible</label> <button data-lx="idel${i}">Supprimer</button></div>`}).join('');
+ return h+`<small style="grid-column:1/-1">L'objet suit la main (ou la tête / le dos) : les bras animés le font bouger. Les curseurs « Poignet » règlent son angle image par image.</small>`}
+function pickItemImg(file,i){if(!file)return;const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,256/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);CH.items[i].img=c.toDataURL('image/png');save();draw()};im.src=r.result};r.readAsDataURL(file)}
+const save=()=>saveChar(CH),M=()=>CH.moves[cur],tot=()=>{if(cur==='_p')return 1;const m=PM();return m.s+m.a+m.e};
+function list(){$('list').innerHTML=Object.entries(Object.assign({},GROUPS,{'Spéciaux aériens':Object.keys(CH.moves).filter(k=>/^(neu|side|up|down)Ba$/.test(k))})).filter(e=>e[1].length).map(([g,ks])=>`<h4>${g}</h4>`+ks.map(k=>`<button data-k="${k}" class="${k==cur?'on':''}">${CH.moves[k].n}</button>`).join('')).join('')+`<h4>Personnage</h4><button data-k="_p" class="${cur=='_p'?'on':''}">Déplacements / physique</button><button data-k="_i" class="${cur=='_i'?'on':''}">Objets (épée, bouclier…)</button>`}
+const num=(l,at,v,st=1)=>`<label>${l}<input type="number" step="${st}" value="${v??0}" ${at}></label>`;
+function form(){
+ const f=$('form'),pv=cur==='_p';$('pvw').style.display=pv?'none':'block';$('rm').style.display=pv?'none':'';
+ if(cur==='_i'){f.innerHTML=itemsForm();$('rm').style.display='none';return}
+ if(pv){f.innerHTML=PF.map(([k,l,st])=>num(l,`data-p="${k}"`,CH.phys[k],st)).join('');return}
+ const m=M();
+ let h=`<label>Nom<input type="text" style="width:150px" value="${m.n}" data-f="n"></label>`;
+ h+=MF.filter(([k])=>!(k==='vx'&&!m.vx&&!m.box)&&!((k==='chmax'||k==='chd')&&!m.ch)).map(([k,l,st])=>num(l,`data-f="${k}"`,m[k]??({gs:1,chmax:60,chd:.4}[k]),st)).join('');
+ if(m.air)h+=num('Lag d\'atterrissage (images)','data-f="land"',m.land);
+ h+=FL.map(([k,l])=>`<label>${l}<input type="checkbox" data-c="${k}" ${m[k]?'checked':''}></label>`).join('');
+ if(!m.thr&&!m.fb){h+=`<label>Zone de dégâts active<input type="checkbox" data-t="1" ${m.box?'checked':''}></label>`;
+  if(m.box){const an=m.boxKeys&&m.boxKeys.length,bn=boxAt(m,fr);h+=`<div class="box"><b>Zone (px depuis les pieds${an?', à l\'image courante':''}) :</b> `+['X','Y','Largeur','Hauteur'].map((l,i)=>`${l} <input type="number" value="${Math.round(bn[i])}" ${an?`data-bn="${i}"`:`data-b="${i}"`}>`).join(' ')+`</div><label>Zone animée image par image<input type="checkbox" data-ba="1" ${an?'checked':''}></label>`+(an?`<div class="box"><button data-lx="bz">Copier la zone de l'image précédente</button> <button data-lx="bd">Supprimer la clé de zone ici</button> <button data-lx="bb">Une clé par image active</button></div>`:'')}}
+ if(m.vis&&!m.fx){m.fx=m.vis.kind==='none'?[]:[m.vis];delete m.vis}
+ m.fx=m.fx||[];m.anim=m.anim||[];if(li>=m.fx.length)li=m.fx.length-1;if(li<0)li=0;
+ h+=`<div class="box"><b>Pose du corps à l'image <span id="fn">0</span> :</b> <button data-lx="fp">◀</button> <button data-lx="fnx">▶</button> <small>(glisse les mains et les pieds sur l'aperçu, ou utilise les curseurs ; flèches ← → du clavier = image précédente/suivante)</small></div>`;
+ h+=PJ.map(([k,l,mn,mx])=>`<label>${l}<span><input type="range" min="${mn}" max="${mx}" data-pj="${k}" style="width:130px"> <output data-po="${k}"></output></span></label>`).join('');
+ h+=`<div class="box"><select id="ps">${POSE_NAMES.map(([id,l])=>`<option value="${id}">${l}</option>`).join('')}</select> <button data-lx="ap">Appliquer cette pose ici</button> <button data-lx="cp">Copier l'image précédente</button> <button data-lx="dk">Supprimer la clé ici</button> <button data-lx="bk">Une clé par image</button> <button data-lx="ck">Tout effacer</button></div>`;
+ h+=moveForm(m);
+ h+=`<div class="box"><b>Visuels (calques) :</b> ${m.fx.map((_,i)=>`<button data-lx="${i}" class="${i==li?'on':''}">${i+1}</button>`).join('')} <button data-lx="add">+ Calque</button> <button data-lx="dup">Dupliquer</button> <button data-lx="del">Supprimer</button></div>`;
+ const v=m.fx[li];
+ if(v){const g=k=>v[k]??FXD[k],sel=(a,list,cur)=>`<select ${a}>${list.map(([id,l])=>`<option value="${id}" ${cur==id?'selected':''}>${l}</option>`).join('')}</select>`;
+  h+=`<label>Type ${sel('data-fk="1"',FX_KINDS,v.kind)}</label><label>Courbe ${sel('data-fx="ease"',FX_EASE,g('ease'))}</label>`;
+  h+=[['x','Position X'],['y','Position Y'],['w','Largeur'],['h','Hauteur'],['rot','Rotation (°)'],['f0','Image de début'],['f1','Image de fin'],['mx','Déplacement X'],['my','Déplacement Y'],['s0','Taille début (×)',.1],['s1','Taille fin (×)',.1],['a0','Opacité début',.1],['a1','Opacité fin',.1],['spin','Rotation pendant (°)'],['n','Quantité']].map(([k,l,st])=>num(l,`data-fx="${k}"`,g(k),st||1)).join('');
+  if(v.kind==='sheet')h+=[['cols','Colonnes'],['rows','Lignes'],['fps','Images/sec']].map(([k,l])=>num(l,`data-fx="${k}"`,g(k))).join('');
+  h+=v.kind==='image'||v.kind==='sheet'?`<label>Fichier image<input type="file" accept="image/*" data-fi="1" style="width:160px"></label>`:`<label>Couleur 1<input type="color" data-fx="color" value="${g('color')}" style="width:60px"></label><label>Couleur 2<input type="color" data-fx="color2" value="${g('color2')}" style="width:60px"></label>`}
+ if(m.fx.length)h+=`<label>Masquer la zone de dégâts à l'écran<input type="checkbox" data-hb="1" ${m.hideBox?'checked':''}></label><small style="grid-column:1/-1">La zone reste active pour les dégâts : seul le visuel s'affiche en jeu.</small>`;
+ f.innerHTML=h;
+}
+function pickImg(file,max){if(!file)return;const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,max/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);M().fx[li].img=c.toDataURL('image/png');save();draw()};im.src=r.result};r.readAsDataURL(file)}
+$('form').oninput=e=>{const t=e.target,d=t.dataset,m=cur==='_p'?null:M();
+ if(d.pimg!==undefined){pickProjImg(t.files[0],+d.pimg);return}
+ if(d.ar){const q=m[d.ar][+d.ai],f=d.af;q[f]=t.type==='checkbox'?(t.checked?1:0):(['shape','color','color2'].includes(f)?t.value:(t.value===''?null:+t.value));if(f==='shape')form();save();draw();return}
+ if(d.ipv){ipv=t.value;fr=0;draw();return}
+ if(d.iimg!==undefined){pickItemImg(t.files[0],+d.iimg);return}
+ if(d.it!==undefined){const it=CH.items[+d.it],f=d['if'];it[f]=t.type==='checkbox'?(t.checked?1:0):(['n','kind','at','color','color2'].includes(f)?t.value:+t.value);if(f==='kind')form();save();draw();return}
+ if(d.pj){play=false;setKey(m,fr,Object.assign({},animPose(m,fr),{[d.pj]:+t.value}));save();draw();return}
+ if(d.bn!==undefined){const b=boxAt(m,fr).slice();b[+d.bn]=+t.value;setBoxKey(m,fr,b);save();draw();return}
+ if(d.ba){if(t.checked)m.boxKeys=[{t:m.s,box:m.box.slice()},{t:m.s+m.a-1,box:m.box.slice()}];else{m.box=boxAt(m,fr).map(Math.round);delete m.boxKeys}form();save();draw();return}
+ if(d.fi){pickImg(t.files[0],M().fx[li].kind==='sheet'?512:256);return}
+ if(d.fk){m.fx[li].kind=t.value;form();save();draw();return}
+ if(d.fx){m.fx[li][d.fx]=['color','color2','ease'].includes(d.fx)?t.value:+t.value;save();draw();return}
+ if(d.ak!==undefined){m.anim[+d.ak][d.af]=d.af==='t'?+t.value:t.value;save();draw();return}
+ if(d.hb){if(t.checked)m.hideBox=1;else delete m.hideBox;save();draw();return}
+ if(d.p)CH.phys[d.p]=+t.value;
+ else if(d.b!==undefined)m.box[+d.b]=+t.value;
+ else if(d.c){if(t.checked){m[d.c]=1;if(d.c==='air'&&m.land==null)m.land=9}else delete m[d.c];if(d.c==='air')form()}
+ else if(d.t){m.box=t.checked?[14,-40,34,18]:null;if(!t.checked)delete m.boxKeys;form()}
+ else if(d.f){m[d.f]=d.f==='n'?t.value:+t.value;if(d.f==='n')list()}
+ save();draw()};
+$('form').onclick=e=>{const dd=e.target.dataset,l=dd.lx;
+ if(dd.ia!==undefined){CH.items.push(JSON.parse(JSON.stringify(ITEM_PRESETS[+dd.ia])));form();save();draw();return}
+ if(l===undefined)return;
+ if(l.startsWith('idel')){CH.items.splice(+l.slice(4),1);form();save();draw();return}
+ const m=M();m.fx=m.fx||[];m.anim=m.anim||[];
+ if(l==='add'){const b=m.box||[14,-40,34,18];m.fx.push({kind:'slash',x:b[0]+b[2]/2,y:b[1]+b[3]/2,w:Math.max(b[2],40),h:Math.max(b[3],30),f0:m.s,f1:m.s+Math.max(m.a,4)-1});li=m.fx.length-1}
+ else if(l==='dup'){if(m.fx[li]){m.fx.splice(li+1,0,JSON.parse(JSON.stringify(m.fx[li])));li++}}
+ else if(l==='del'){m.fx.splice(li,1);li=Math.max(0,li-1)}
+ else if(l==='fp'){fr=Math.max(0,fr-1);play=false}
+ else if(l==='fnx'){fr=Math.min(tot(),fr+1);play=false}
+ else if(l==='ap'){setKey(m,fr,POSES[$('ps').value]);play=false}
+ else if(l==='cp'){setKey(m,fr,animPose(m,Math.max(0,fr-1)));play=false}
+ else if(l==='dk'){m.anim=m.anim.filter(k=>k.t!==fr);if(!m.anim.length)m.anim=[{t:0,p:'neutral'}]}
+ else if(l==='bk'){const T=tot(),ks=[];for(let i=0;i<=T;i++)ks.push({t:i,pose:animPose(m,i)});m.anim=[];ks.forEach(k=>setKey(m,k.t,k.pose))}
+ else if(l==='ck')m.anim=[{t:0,p:'neutral'}];
+ else if(l==='bz'){setBoxKey(m,fr,boxAt(m,Math.max(0,fr-1)).slice())}
+ else if(l==='bd'){if(m.boxKeys.length>1)m.boxKeys=m.boxKeys.filter(k=>k.t!==fr)}
+ else if(l==='bb'){const ks=[];for(let i=m.s;i<m.s+m.a;i++)ks.push({t:i,box:boxAt(m,i).map(Math.round)});m.boxKeys=ks}
+ else if(l==='amv')m.mv=(m.mv||[]).concat([{t:m.s,vx:0,vy:null}]);
+ else if(l==='atp')m.tp=(m.tp||[]).concat([{t:m.s,dx:60,dy:0}]);
+ else if(l==='aproj')m.proj=(m.proj||[]).concat([{t:m.s,x:24,y:-34,vx:7,vy:0,g:0,life:90,r:9,d:6,kb:4,gr:.06,ang:30,color:'#ff8c28',color2:'#ffd24a',shape:'burst',n:1,spread:0,bounce:0,pierce:0,spin:0}]);
+ else if(l.startsWith('rmv'))m.mv.splice(+l.slice(3),1);
+ else if(l.startsWith('rtp'))m.tp.splice(+l.slice(3),1);
+ else if(l.startsWith('rproj'))m.proj.splice(+l.slice(5),1);
+ else if(l==='mkair'){const k=cur+'a';CH.moves[k]=Object.assign(JSON.parse(JSON.stringify(m)),{k,n:m.n+' (aérien)',air:1});cur=k;fr=0;li=0;list()}
+ else if(l==='rmair'){delete CH.moves[cur];cur=cur.slice(0,-1);fr=0;li=0;list()}
+ else li=+l;
+ form();save();draw()};
+$('list').onclick=e=>{const k=e.target.dataset.k;if(!k)return;cur=k;fr=0;li=0;list();form();draw()};
+function draw(){
+ const x=$('pv').getContext('2d');x.clearRect(0,0,480,300);if(cur==='_p')return;
+ const m=PM(),S=2.2,ox=200,oy=235,T=tot();
+ x.strokeStyle='#4b5a7a';x.lineWidth=2;x.beginPath();x.moveTo(0,oy);x.lineTo(480,oy);x.stroke();
+ const po=animPose(m,fr),J=joints(po);drawBody(x,ox,oy,1,po,'#4aa3ff',S,CH.items);
+ if(m.box){const b=boxAt(m,fr),rx=ox+b[0]*S,ry=oy+b[1]*S,rw=b[2]*S,rh=b[3]*S,act=fr>=m.s&&fr<m.s+m.a;
+  const hid=m.hideBox&&hasFx(m);x.fillStyle=act&&!hid?'rgba(255,140,40,.65)':'rgba(255,255,255,.07)';x.fillRect(rx,ry,rw,rh);
+  x.strokeStyle=act?'#ff8c28':'#778';x.lineWidth=1.5;x.setLineDash([4,3]);x.strokeRect(rx,ry,rw,rh);x.setLineDash([]);x.fillStyle='#ff8c28';x.fillRect(rx+rw-4,ry+rh-4,8,8);
+  const cx=rx+rw/2,cy=ry+rh/2,a=m.ang*Math.PI/180,L=20+m.kb*5,ex=cx+Math.cos(a)*L,ey=cy-Math.sin(a)*L;
+  x.strokeStyle='#ff5';x.lineWidth=2;x.beginPath();x.moveTo(cx,cy);x.lineTo(ex,ey);
+  x.lineTo(ex-Math.cos(a-.4)*8,ey+Math.sin(a-.4)*8);x.moveTo(ex,ey);x.lineTo(ex-Math.cos(a+.4)*8,ey+Math.sin(a+.4)*8);x.stroke()}
+ else{x.fillStyle='#99a';x.font='13px system-ui';x.fillText('Pas de zone de dégâts (projectile / lancer)',20,40)}
+ drawFx(x,m,1,ox,oy,fr,S);
+ for(const q of m.proj||[]){if(fr<q.t)continue;const age=fr-q.t,n=Math.max(1,q.n|0);
+  for(let i=0;i<n;i++){const a=(i-(n-1)/2)*(q.spread||0)*Math.PI/180,c=Math.cos(a),sn=Math.sin(a),vx=q.vx*c-q.vy*sn;let vy=q.vx*sn+q.vy*c,px=q.x,py=q.y;
+   for(let k=1;k<=Math.min(age+1,q.life||90);k++){vy+=q.g||0;px+=vx;py+=vy;if(k<=age&&k%5===0){x.fillStyle='rgba(255,255,255,.3)';x.fillRect(ox+px*S-1,oy+py*S-1,3,3)}}
+   drawLayer(x,{kind:q.shape||'burst',x:0,y:0,w:(q.r||9)*2,h:(q.r||9)*2,rot:Math.atan2(vy,Math.abs(vx))*180/Math.PI,spin:q.spin||0,f0:0,f1:q.life||90,a0:1,a1:1,ease:'lin',color:q.color,color2:q.color2,n:6,img:q.img},1,ox+px*S,oy+py*S,Math.min(age,q.life||90),S)}}
+ if(cur!=='_i')for(const q of[J.hand,J.handB,J.foot,J.footB]){x.strokeStyle='#fff';x.lineWidth=1.5;x.fillStyle='rgba(0,0,0,.5)';x.beginPath();x.arc(ox+q[0]*S,oy+q[1]*S,5,0,7);x.fill();x.stroke()}const W=440,by=268;let px=20;
+ [[m.s,'#4aa3ff'],[m.a,'#ff8c28'],[m.e,'#6bbf6b']].forEach(([n,c])=>{x.fillStyle=c;x.fillRect(px,by,W*n/T,14);px+=W*n/T});
+ (m.anim||[]).forEach(k=>{x.fillStyle='#0ff';x.fillRect(20+W*k.t/T-1,by-9,3,6)});(m.boxKeys||[]).forEach(k=>{x.fillStyle='#ff8c28';x.fillRect(20+W*k.t/T-1,by+16,3,6)});
+ x.fillStyle='#fff';x.fillRect(20+W*fr/T-1,by-4,3,22);
+ x.font='bold 14px system-ui';x.fillStyle='#fff';
+ x.fillText((fr<m.s?'Démarrage':fr<m.s+m.a?'ACTIF':'Lag de fin')+' — image '+fr+'/'+T,20,24);
+ x.font='12px system-ui';x.fillStyle='#aab';x.textAlign='right';x.fillText('Total : '+T+' images ≈ '+Math.round(T*16.7)+' ms',460,24);x.textAlign='left';
+ $('sl').max=T;$('sl').value=fr;sync();
+}
+const cv=$('pv');let drag=null;
+const pt=e=>{const r=cv.getBoundingClientRect();return[(e.clientX-r.left)*480/r.width,(e.clientY-r.top)*300/r.height]};
+cv.onpointerdown=e=>{if(cur==='_p'||cur==='_i')return;const[mx,my]=pt(e),m=M(),J=joints(animPose(m,fr));
+ for(const[k,q,pv]of[['af',J.hand,J.sh],['ab',J.handB,J.sh],['lf',J.foot,J.hip],['lb',J.footB,J.hip]])if(Math.hypot(mx-OX-q[0]*SC,my-OY-q[1]*SC)<12){drag={k,pv};cv.setPointerCapture(e.pointerId);play=false;return}
+ const b=m.box&&boxAt(m,fr);if(b){const rx=OX+b[0]*SC,ry=OY+b[1]*SC,rw=b[2]*SC,rh=b[3]*SC;
+  if(Math.abs(mx-rx-rw)<10&&Math.abs(my-ry-rh)<10){drag={rs:1};cv.setPointerCapture(e.pointerId);play=false}
+  else if(mx>rx&&mx<rx+rw&&my>ry&&my<ry+rh){drag={mv:1,dx:mx-rx,dy:my-ry};cv.setPointerCapture(e.pointerId);play=false}}};
+cv.onpointermove=e=>{if(!drag)return;const[mx,my]=pt(e),m=M();
+ if(drag.k)setKey(m,fr,Object.assign({},animPose(m,fr),{[drag.k]:Math.round(Math.atan2(my-OY-drag.pv[1]*SC,mx-OX-drag.pv[0]*SC)*180/Math.PI)}));
+ else{const b=boxAt(m,fr).slice();if(drag.mv){b[0]=(mx-drag.dx-OX)/SC;b[1]=(my-drag.dy-OY)/SC}else{b[2]=Math.max(4,(mx-OX)/SC-b[0]);b[3]=Math.max(4,(my-OY)/SC-b[1])}setBoxKey(m,fr,b)}
+ save();draw()};
+cv.onpointerup=()=>{drag=null};
+addEventListener('keydown',e=>{if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)||cur==='_p')return;if(e.key==='ArrowRight'){fr=Math.min(tot(),fr+1);play=false;draw()}if(e.key==='ArrowLeft'){fr=Math.max(0,fr-1);play=false;draw()}});
+$('sl').oninput=e=>{fr=+e.target.value;play=false;draw()};
+$('pl').onclick=()=>play=!play;
+setInterval(()=>{if(play&&cur!=='_p'){fr=fr>=tot()?0:fr+1;draw()}},50);
+$('rm').onclick=()=>{CH.moves[cur]=baseChar().moves[cur];save();form();list();draw()};
+$('ra').onclick=()=>{if(confirm('Tout remettre aux valeurs par défaut ?')){CH=baseChar();CH.items=CH.items||[];save();$('nm').value=CH.name;list();form();draw()}};
+$('nm').oninput=e=>{CH.name=e.target.value;save()};
+$('ex').onclick=()=>{const src="// Personnage généré par l'éditeur — remplace ce fichier dans ton dépôt GitHub, le jeu l'utilise tel quel\nconst CHAR_BUILD="+Date.now()+";\nconst CHAR_DEFAULT="+JSON.stringify(CH)+";\n";const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([src],{type:'text/javascript'}));a.download='personnage.js';a.click()};
+$('im').onclick=()=>$('fi').click();
+$('fi').onchange=e=>{const f=e.target.files[0];if(!f)return;f.text().then(t=>{try{const i=t.indexOf('const CHAR_DEFAULT=');const j=JSON.parse(i>=0?t.slice(i+19).trim().replace(/;$/,''):t);if(!j.moves)throw 0;CH=baseChar();CH.name=j.name||CH.name;Object.assign(CH.phys,j.phys);for(const k in j.moves)CH.moves[k]=j.moves[k];CH.items=j.items||CH.items||[];if((j.schema||1)<2)migrate(CH);save();cur='jab';fr=0;$('nm').value=CH.name;list();form();draw()}catch(er){alert('Fichier invalide')}});e.target.value=''};
+$('nm').value=CH.name;list();form();draw();
+</script></body></html>
