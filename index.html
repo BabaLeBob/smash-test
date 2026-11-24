@@ -71,7 +71,7 @@ const jp=a=>cur[a]&&pr[a]===fr,bp=a=>pr[a]!==undefined&&fr-pr[a]<=4,tapped=a=>cu
 // ---- monde
 const BZ={l:-650,r:1610,t:-650,b:1000},cam={x:480,y:270,z:1,init:0},GR=.5,B={x:140,y:400,w:680,h:120},SP=[{x:250,y:290,w:150},{x:560,y:290,w:150}],PL=[B,...SP];
 // ---- LISTE DES PERSONNAGES : ajoute ici le nom de chaque fichier personnage (le premier doit rester personnage.js)
-const ROSTER=['personnage.js', 'personnage1.js'];
+const ROSTER=['personnage.js', 'personnage1.js', 'personnage2.js'];
 let CH=loadChar(),M=CH.moves,PH=CH.phys;
 const CHARS=[{file:'personnage.js',data:CH}];let CP=CH,CA=CH;
 function parseChar(t){t=t.replace(/^\ufeff/,'');let i=t.search(/CHAR_DEFAULT\s*=/);if(i<0)i=t.indexOf('{');else i=t.indexOf('{',i);
