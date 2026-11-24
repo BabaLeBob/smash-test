@@ -228,7 +228,7 @@ function drawBody(x,px,py,face,po,col,S,items,body,opt){
  S=S||1;items=items||[];const b=Object.assign({},BODY_DEFAULT,body),o=opt||{},hcol=o.hcol||col,J=joints(po,b),tr=(po.t||0)*Math.PI/180;
  x.save();x.translate(px,py);x.scale(face*S,S);x.lineCap='round';x.lineJoin='round';x.strokeStyle=x.fillStyle=col||'#4aa3ff';
  const Ln=(a,c,w)=>{x.lineWidth=w;x.beginPath();x.moveTo(a[0],a[1]);x.lineTo(c[0],c[1]);x.stroke()};
- const IT=at=>{for(const it of items){if(it.show===0||it.at!==at)continue;if(it.when==='atk'&&!o.atk)continue;if(it.when==='idle'&&o.atk)continue;let pos,ang,k=1;
+ const IT=at=>{for(const it of items){if(it.show===0||it.at!==at)continue;if(it.when==='atk'&&!o.atk)continue;if(it.when==='idle'&&o.atk)continue;if(it.mv&&it.mv.length&&!(o.mk&&it.mv.includes(o.mk)))continue;let pos,ang,k=1;
   if(at==='main'){pos=J.hand;ang=po.af+(po.rf||0)}else if(at==='off'){pos=J.handB;ang=po.ab+(po.rb||0)}
   else if(at==='back'){pos=[J.sh[0]-3,J.sh[1]+4];ang=ABS_KINDS.includes(it.kind)?(po.t||0):-135+(po.t||0)}
   else if(at==='head'){pos=J.head;ang=-90+(po.t||0);k=b.headR/10}

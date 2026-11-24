@@ -71,7 +71,7 @@ const jp=a=>cur[a]&&pr[a]===fr,bp=a=>pr[a]!==undefined&&fr-pr[a]<=4,tapped=a=>cu
 // ---- monde
 const BZ={l:-650,r:1610,t:-650,b:1000},cam={x:480,y:270,z:1,init:0},GR=.5,B={x:140,y:400,w:680,h:120},SP=[{x:250,y:290,w:150},{x:560,y:290,w:150}],PL=[B,...SP];
 // ---- LISTE DES PERSONNAGES : ajoute ici le nom de chaque fichier personnage (le premier doit rester personnage.js)
-const ROSTER=['personnage.js', 'personnage1.js', 'personnage2.js'];
+const ROSTER=['personnage.js', 'personnage1.js'];
 let CH=loadChar(),M=CH.moves,PH=CH.phys;
 const CHARS=[{file:'personnage.js',data:CH}];let CP=CH,CA=CH;
 function parseChar(t){t=t.replace(/^\ufeff/,'');let i=t.search(/CHAR_DEFAULT\s*=/);if(i<0)i=t.indexOf('{');else i=t.indexOf('{',i);
@@ -419,7 +419,7 @@ function drawF(e,col){
  const dgi=e.st==='dodge'&&e.t>=DG[e.dk][0]&&e.t<=DG[e.dk][1],gh=c=>{const m=/^#([0-9a-f]{6})$/i.exec(c);if(!m)return c;const n=parseInt(m[1],16);return'rgba('+(n>>16)+','+(n>>8&255)+','+(n&255)+',.35)'};
  const po=e.st==='atk'?animPose(e.m,e.t):e.st==='stun'?POSES.armsWide:e.st==='broken'?POSE_BRK:e.st==='dodge'?(e.dk==='air'?POSES.starfish:POSES.crouch):statePose(e,fr);
  if(e.buf){X.save();X.globalAlpha=.22+.1*Math.sin(fr*.3);X.fillStyle=e.buf.col;X.beginPath();X.arc(e.x,e.y-bd.H/2,bd.H*.75,0,7);X.fill();X.restore()}
- drawBody(X,e.x,e.y,e.face,po,dgi?gh(cl.col):cl.col,sc,C.items,bo,{hcol:dgi?gh(cl.hcol):cl.hcol,atk:e.st==='atk'});
+ drawBody(X,e.x,e.y,e.face,po,dgi?gh(cl.col):cl.col,sc,C.items,bo,{hcol:dgi?gh(cl.hcol):cl.hcol,atk:e.st==='atk',mk:e.st==='atk'&&e.m?e.m.k:null});
  if(bo.color){X.fillStyle=col;X.beginPath();X.moveTo(e.x-6,e.y-bd.H-20);X.lineTo(e.x+6,e.y-bd.H-20);X.lineTo(e.x,e.y-bd.H-10);X.closePath();X.fill()}
  if(e.st==='shield'){const q=e.sh/100,rr=(14+30*q)*sc,hue=q>.5?'120,200,255':q>.25?'255,210,90':'255,110,90';X.fillStyle='rgba('+hue+','+(.3+(e.sfl>0?.35:0))+')';X.strokeStyle='rgba('+hue+',.85)';X.lineWidth=2;X.beginPath();X.arc(e.x,e.y-bd.H/2,rr,0,7);X.fill();X.stroke()}
  if(e.sh!==undefined&&e.st!=='broken'&&(e.st==='shield'||e.sh<100)){const q=e.sh/100;X.fillStyle='rgba(0,0,0,.55)';X.fillRect(e.x-20,e.y-bd.H-34,40,5);X.fillStyle=q>.5?'#78c8ff':q>.25?'#ffd25a':'#ff6e5a';X.fillRect(e.x-20,e.y-bd.H-34,40*q,5)}
