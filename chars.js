@@ -1,7 +1,7 @@
 // Moteur des données personnage : chargement, brouillon local de l'éditeur, corps, objets, visuels, sons (les données sont dans personnage.js)
 const CHAR_VERSION=2,SCHEMA=3;
 // ---------- Corps : taille et forme
-const BODY_DEFAULT={scale:1,headR:10,headShape:'round',headDeco:'none',eyes:'dot',torL:22,torW:13,torShape:'stick',armL:22,armW:8,legL:26,legW:9,tail:0,tailW:6,color:'',headColor:''};
+const BODY_DEFAULT={scale:1,headR:10,headShape:'round',headDeco:'none',eyes:'dot',torL:22,torW:13,torShape:'stick',armL:22,armW:8,legL:26,legW:9,tail:0,tailW:6,color:'',headColor:'',mc:0,skin:'',mcHead:'3q',mcLayer:1};
 const HEAD_SHAPES=[['round','Rond'],['square','Carré'],['oval','Ovale (haut)'],['wide','Ovale (large)'],['triangle','Triangle']];
 const HEAD_DECOS=[['none','Aucun'],['cat','Oreilles de chat'],['bunny','Oreilles de lapin'],['horns','Cornes'],['antenna','Antenne'],['spikes','Piques']];
 const EYES=[['dot','Point'],['big','Grands yeux'],['angry','Méchant'],['visor','Visière'],['none','Aucun']];
@@ -9,7 +9,7 @@ const TORSO_SHAPES=[['stick','Bâton'],['ellipse','Ovale (ventre)'],['box','Boî
 function bodyDims(b,m){b=Object.assign({},BODY_DEFAULT,b);const sc=(b.scale||1)*(m||1),H=(56+(b.legL-26)+(b.torL-22)+(b.headR-10)*2)*sc,W=Math.max(8,14+(Math.max(b.torW,b.headR*1.3)-13)*.5)*sc;return{sc,H,W,FW:W*12/14}}
 const BD0=bodyDims();
 function bodyCols(b,team,flash){b=b||BODY_DEFAULT;const col=flash?'#fff':(b.color||team);return{col,hcol:flash?'#fff':(b.headColor||col)}}
-const BODY_PRESETS=[['Normal',{}],['Petit et vif',{scale:.7}],['Géant',{scale:1.6}],['Gros bonhomme',{torShape:'ellipse',torW:24,armW:11,legW:12,headR:11,scale:1.15}],['Grosse tête (chibi)',{headR:17,legL:18,torL:16,armL:16,scale:.9}],['Long et fin',{legL:36,torL:28,armL:28,torW:8,armW:6,legW:6,headR:8}],['Chat',{headDeco:'cat',tail:38,tailW:5,headR:11,scale:.85}],['Lapin',{headDeco:'bunny',tail:10,tailW:9,legL:30,headR:10}],['Robot',{headShape:'square',torShape:'box',torW:18,eyes:'visor',headDeco:'antenna',color:'#9aa4b0',headColor:'#7d8794'}],['Princesse',{torShape:'cone',torW:12,headDeco:'none',eyes:'big'}]];
+const BODY_PRESETS=[['Normal',{}],['Petit et vif',{scale:.7}],['Géant',{scale:1.6}],['Gros bonhomme',{torShape:'ellipse',torW:24,armW:11,legW:12,headR:11,scale:1.15}],['Grosse tête (chibi)',{headR:17,legL:18,torL:16,armL:16,scale:.9}],['Long et fin',{legL:36,torL:28,armL:28,torW:8,armW:6,legW:6,headR:8}],['Chat',{headDeco:'cat',tail:38,tailW:5,headR:11,scale:.85}],['Lapin',{headDeco:'bunny',tail:10,tailW:9,legL:30,headR:10}],['Robot',{headShape:'square',torShape:'box',torW:18,eyes:'visor',headDeco:'antenna',color:'#9aa4b0',headColor:'#7d8794'}],['Princesse',{torShape:'cone',torW:12,headDeco:'none',eyes:'big'}],['Minecraft (joueur)',{mc:1,headR:9,torL:26,torW:9,armL:26,armW:9,legL:26,legW:9,tail:0,headDeco:'none'}]];
 // ---------- Sons (synthétisés, aucun fichier)
 let SFX_ON=true,_ac=null;
 const SFX_LIST=[['','(aucun)'],['punch','Coup'],['swish','Sifflement'],['whoosh','Souffle'],['zap','Électrique'],['boom','Explosion'],['laser','Laser'],['coin','Pièce'],['jump','Rebond'],['power','Montée de puissance'],['heal','Soin']];
@@ -222,8 +222,46 @@ function drawItem(x,it,pos,ang,k){
  case'orb':circ(0,0,W*.55,c2);circ(0,0,W*.4,c1);circ(-W*.12,-W*.12,W*.14,'#fff');break;
  case'drone':rect(-W*.7,-W*.4,W*1.4,W*.8,c1);ln(-W*.9,-W*.8,W*.9,-W*.8,2,c2);ln(0,-W*.4,0,-W*.8,2,c2);circ(0,W*.15,W*.2,c2);break;
  case'star':star(0,0,W,W*.45,5,c1);break;
- case'image':if(it.img){const i=getImg(it.img);if(i.complete&&i.naturalWidth)x.drawImage(i,-L*.15,-W/2,L,W)}break}
+ case'image':if(it.img){const i=getImg(it.img);if(i.complete&&i.naturalWidth)x.drawImage(i,-L*(it.px??15)/100,-W*(it.py??50)/100,L,W)}break}
  x.restore()}
+// ---------- Modèle Minecraft (skin 64x64 / 64x32, vue de profil)
+const MC_PARTS={head:{o:[0,0],D:8,H:8,ov:[32,0]},body:{o:[16,16],D:4,H:12,ov:[16,32]},rarm:{o:[40,16],D:4,H:12,ov:[40,32]},larm:{o:[32,48],D:4,H:12,ov:[48,48],old:'rarm'},rleg:{o:[0,16],D:4,H:12,ov:[0,32]},lleg:{o:[16,48],D:4,H:12,ov:[0,48],old:'rleg'}};
+const MC_HEADS=[['3q','Trois-quarts (visage visible)'],['face','De face'],['side','De profil']];
+const _sk={};
+function mcDefaultSkin(){const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d'),R=(x,y,w,h,col)=>{g.fillStyle=col;g.fillRect(x,y,w,h)};
+ const skin='#c99572',hair='#4a3320',shirt='#00a8a8',pants='#3c3c9c',shoe='#6b6b6b';
+ R(0,8,32,8,skin);R(0,8,32,3,hair);R(24,8,8,8,hair);R(0,11,3,3,hair);R(21,11,3,3,hair);R(8,0,16,8,hair);
+ R(9,12,1,1,'#fff');R(10,12,1,1,'#3b3b8f');R(13,12,1,1,'#3b3b8f');R(14,12,1,1,'#fff');R(11,13,2,1,'#b07a58');R(10,14,4,1,'#7d4a35');
+ R(16,20,24,12,shirt);
+ R(40,20,16,12,skin);R(40,20,16,4,shirt);R(32,52,16,12,skin);R(32,52,16,4,shirt);
+ R(0,20,16,12,pants);R(0,30,16,2,shoe);R(16,52,16,12,pants);R(16,62,16,2,shoe);return c}
+function getSkin(u){const k=u||'_def';let s=_sk[k];if(s)return s;
+ s=_sk[k]={ok:false,c:null,f:1,old:false,dk:null,_s:{}};
+ const fin=src=>{const w=src.width||src.naturalWidth,h=src.height||src.naturalHeight;s.c=src;s.f=w/64;s.old=h<w*.75;
+  const d=document.createElement('canvas');d.width=w;d.height=h;const g=d.getContext('2d');g.drawImage(src,0,0);g.globalCompositeOperation='source-atop';g.fillStyle='rgba(0,0,0,.38)';g.fillRect(0,0,w,h);s.dk=d;s.ok=true;
+  if(typeof window!=='undefined'&&window.onSkinLoad)window.onSkinLoad()};
+ if(!u)fin(mcDefaultSkin());else{const im=new Image();im.onload=()=>fin(im);im.src=u}
+ return s}
+function skinSil(s,col){let c=s._s[col];if(!c){const w=s.c.width||s.c.naturalWidth,h=s.c.height||s.c.naturalHeight;c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');g.drawImage(s.c,0,0);g.globalCompositeOperation='source-in';g.fillStyle=col;g.fillRect(0,0,w,h);s._s[col]=c}return c}
+function mcMode(col){col=col||'';return{white:col==='#fff'||col==='#ffffff',ghost:/^rgba/.test(col),tint:col==='#ff8c28'?col:null}}
+function mcFace(x,s,r,dx,dy,dw,dh,md,dark){const f=s.f,a=[r[0]*f,r[1]*f,r[2]*f,r[3]*f];
+ if(md.white){x.drawImage(skinSil(s,'#ffffff'),a[0],a[1],a[2],a[3],dx,dy,dw,dh);return}
+ x.drawImage(dark?s.dk:s.c,a[0],a[1],a[2],a[3],dx,dy,dw,dh);
+ if(md.tint){x.save();x.globalAlpha*=.45;x.drawImage(skinSil(s,md.tint),a[0],a[1],a[2],a[3],dx,dy,dw,dh);x.restore()}}
+function mcPart(x,s,key,dx,dy,dw,dh,md,dark,layer){const P=MC_PARTS[key],K=(s.old&&P.old)?MC_PARTS[P.old]:P,D=P.D,H=P.H;
+ mcFace(x,s,[K.o[0],K.o[1]+D,D,H],dx,dy,dw,dh,md,dark);
+ if(layer&&(!s.old||key==='head')){const q=P.ov,e=Math.min(dw,dh)*.06;mcFace(x,s,[q[0],q[1]+D,D,H],dx-e,dy-e,dw+2*e,dh+2*e,md,dark)}}
+function mcHead(x,s,r,mode,md,layer){const w=2*r,part=(ux,uy,e)=>{const sw=mode==='side'?w:mode==='face'?0:w*.38,fw=w-sw;
+  if(sw>0)mcFace(x,s,[ux,uy+8,8,8],-r-e,-r-e,sw+e,w+2*e,md);
+  if(fw>0)mcFace(x,s,[ux+8,uy+8,8,8],-r+sw,-r-e,fw+e,w+2*e,md)};
+ part(0,0,0);if(layer)part(32,0,r*.07)}
+function drawMC(x,J,b,tr,col,IT){const s0=getSkin(b.skin),s=s0.ok?s0:getSkin(''),md=mcMode(col),lay=b.mcLayer!==0;
+ x.imageSmoothingEnabled=false;if(md.ghost)x.globalAlpha=.35;
+ const limb=(p,q,w,key,dark)=>{const dx=q[0]-p[0],dy=q[1]-p[1],len=Math.hypot(dx,dy)||1;x.save();x.translate(p[0],p[1]);x.rotate(Math.atan2(dy,dx)-Math.PI/2);mcPart(x,s,key,-w/2,0,w,len,md,dark,lay);x.restore()};
+ limb(J.hip,J.footB,b.legW,'lleg',1);limb(J.sh,J.handB,b.armW,'larm',1);IT('footB');IT('off');
+ x.save();x.translate(J.sh[0],J.sh[1]);x.rotate(tr);mcPart(x,s,'body',-b.torW/2,0,b.torW,b.torL,md,0,lay);x.restore();
+ limb(J.hip,J.foot,b.legW,'rleg',0);IT('foot');IT('chest');limb(J.sh,J.hand,b.armW,'rarm',0);
+ x.save();x.translate(J.head[0]-Math.sin(tr)*2,J.head[1]+Math.cos(tr)*2);x.rotate(tr);mcHead(x,s,b.headR,b.mcHead||'3q',md,lay);x.restore()}
 function drawBody(x,px,py,face,po,col,S,items,body,opt){
  S=S||1;items=items||[];const b=Object.assign({},BODY_DEFAULT,body),o=opt||{},hcol=o.hcol||col,J=joints(po,b),tr=(po.t||0)*Math.PI/180;
  x.save();x.translate(px,py);x.scale(face*S,S);x.lineCap='round';x.lineJoin='round';x.strokeStyle=x.fillStyle=col||'#4aa3ff';
@@ -238,6 +276,7 @@ function drawBody(x,px,py,face,po,col,S,items,body,opt){
   else{pos=[J.sh[0]-26,J.sh[1]-22+Math.sin(Date.now()/350)*3];ang=0}
   drawItem(x,it,pos,ang+(it.rot||0),k)}};
  IT('back');IT('hip');
+ if(b.mc){drawMC(x,J,b,tr,col,IT);IT('main');IT('head');IT('float');x.restore();return}
  if(b.tail>0){x.save();x.lineWidth=b.tailW;x.beginPath();x.moveTo(J.hip[0],J.hip[1]);x.quadraticCurveTo(J.hip[0]-b.tail*.6,J.hip[1]+b.tail*.15,J.hip[0]-b.tail*.85,J.hip[1]-b.tail*.6);x.stroke();x.restore()}
  x.globalAlpha=.6;Ln(J.hip,J.footB,b.legW*.9);Ln(J.sh,J.handB,b.armW*.875);x.globalAlpha=1;IT('footB');IT('off');
  // torse

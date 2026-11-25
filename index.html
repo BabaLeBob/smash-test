@@ -414,13 +414,15 @@ function fig(e,col,dm){
  X.restore();
 }
 function drawF(e,col){
- if(e.st==='down'){fig(e,col);return}
+ if(e.st==='down'&&!(e.C&&e.C.body&&e.C.body.mc)){fig(e,col);return}
  const bd=e.bd||BD0,sc=bd.sc,C=e.C,bo=C.body,burn=e.dt&&e.dt.n>0&&((fr>>2)&1),cl=bodyCols(bo,burn?'#ff8c28':col,e.fl>0);
  const dgi=e.st==='dodge'&&e.t>=DG[e.dk][0]&&e.t<=DG[e.dk][1],gh=c=>{const m=/^#([0-9a-f]{6})$/i.exec(c);if(!m)return c;const n=parseInt(m[1],16);return'rgba('+(n>>16)+','+(n>>8&255)+','+(n&255)+',.35)'};
  const po=e.st==='atk'?animPose(e.m,e.t):e.st==='stun'?POSES.armsWide:e.st==='broken'?POSE_BRK:e.st==='dodge'?(e.dk==='air'?POSES.starfish:POSES.crouch):statePose(e,fr);
  if(e.buf){X.save();X.globalAlpha=.22+.1*Math.sin(fr*.3);X.fillStyle=e.buf.col;X.beginPath();X.arc(e.x,e.y-bd.H/2,bd.H*.75,0,7);X.fill();X.restore()}
- drawBody(X,e.x,e.y,e.face,po,dgi?gh(cl.col):cl.col,sc,C.items,bo,{hcol:dgi?gh(cl.hcol):cl.hcol,atk:e.st==='atk',mk:e.st==='atk'&&e.m?e.m.k:null});
- if(bo.color){X.fillStyle=col;X.beginPath();X.moveTo(e.x-6,e.y-bd.H-20);X.lineTo(e.x+6,e.y-bd.H-20);X.lineTo(e.x,e.y-bd.H-10);X.closePath();X.fill()}
+ const lying=e.st==='down'&&bo.mc;if(lying){X.save();X.translate(e.x,e.y-10*sc);X.rotate(-1.5*e.face)}
+ drawBody(X,lying?0:e.x,lying?35*sc:e.y,e.face,lying?POSES.neutral:po,dgi?gh(cl.col):cl.col,sc,C.items,bo,{hcol:dgi?gh(cl.hcol):cl.hcol,atk:e.st==='atk',mk:e.st==='atk'&&e.m?e.m.k:null});
+ if(lying)X.restore();
+ if(bo.color||bo.mc){X.fillStyle=col;X.beginPath();X.moveTo(e.x-6,e.y-bd.H-20);X.lineTo(e.x+6,e.y-bd.H-20);X.lineTo(e.x,e.y-bd.H-10);X.closePath();X.fill()}
  if(e.st==='shield'){const q=e.sh/100,rr=(14+30*q)*sc,hue=q>.5?'120,200,255':q>.25?'255,210,90':'255,110,90';X.fillStyle='rgba('+hue+','+(.3+(e.sfl>0?.35:0))+')';X.strokeStyle='rgba('+hue+',.85)';X.lineWidth=2;X.beginPath();X.arc(e.x,e.y-bd.H/2,rr,0,7);X.fill();X.stroke()}
  if(e.sh!==undefined&&e.st!=='broken'&&(e.st==='shield'||e.sh<100)){const q=e.sh/100;X.fillStyle='rgba(0,0,0,.55)';X.fillRect(e.x-20,e.y-bd.H-34,40,5);X.fillStyle=q>.5?'#78c8ff':q>.25?'#ffd25a':'#ff6e5a';X.fillRect(e.x-20,e.y-bd.H-34,40*q,5)}
  if(e.st==='broken'){X.save();X.font='bold 16px system-ui';X.textAlign='center';X.fillStyle='#ffd24a';for(let i=0;i<3;i++){const a=fr*.12+i*2.094;X.fillText('★',e.x+Math.cos(a)*18*sc,e.y-bd.H-6+Math.sin(a)*5)}

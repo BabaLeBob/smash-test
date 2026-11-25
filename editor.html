@@ -54,6 +54,7 @@ const PSTR=['shape','color','color2','hk','hc','hc2','sf','sh','txt','exs','ht']
 const FSTR=['color','color2','ease','at','txt'];
 const IVM=[[0,'Aucune'],[1,'Invincible'],[2,'Armure (ne recule pas)']];
 const HKINDS=[['','Aucun'],...FX_KINDS.filter(k=>!['sheet','image'].includes(k[0]))];
+window.onSkinLoad=()=>{try{draw()}catch(e){}};
 let CH=loadChar(),cur='jab',fr=0,play=true,li=0,ipv='fsmash';
 const OPEN=new Set(['base']);
 const OX=200,OY=235,ZM=2.2;
@@ -107,12 +108,13 @@ function itemsForm(){
  let h=`<div class="box"><b>Ajouter un objet :</b></div>`+groups.map(g=>`<div class="box"><small style="width:80px">${g}</small>${ITEM_PRESETS.map((p,i)=>p.g===g?`<button data-ia="${i}">${p.n}</button>`:'').join(' ')}</div>`).join('');
  h+=`<div class="box">Aperçu avec l'attaque : <select data-ipv="1">${Object.keys(CH.moves).map(k=>`<option value="${k}" ${k==ipv?'selected':''}>${E(CH.moves[k].n)}</option>`).join('')}</select></div>`;
  h+=CH.items.map((it,i)=>{const a=f=>`data-it="${i}" data-if="${f}"`,n=(f,l)=>`<label>${l} <input type="number" value="${it[f]??0}" ${a(f)} style="width:64px"></label>`,sel=(f,list)=>`<select ${a(f)}>${list.map(([id,l])=>`<option value="${id}" ${(it[f]??'')==id?'selected':''}>${l}</option>`).join('')}</select>`;
-  return `<div class="box card"><input type="text" value="${E(it.n)}" ${a('n')} style="width:110px"> ${sel('kind',ITEM_KINDS)} ${sel('at',ITEM_AT)} ${n('len','Longueur')} ${n('w','Épaisseur')} ${n('rot','Rotation °')} ${n('ox','Décalage X')} ${n('oy','Décalage Y')} ${n('glow','Lueur')} ${n('spin','Tourne (°/s)')} ${sel('when',ITEM_WHEN)} ${mvUI(it,i)} <input type="color" value="${it.color||'#cccccc'}" ${a('color')}> <input type="color" value="${it.color2||'#8a5a2b'}" ${a('color2')}> ${it.kind==='image'?`<input type="file" accept="image/*" data-iimg="${i}" style="width:150px">`:''} <label><input type="checkbox" ${it.show===0?'':'checked'} ${a('show')}> visible</label> <button data-lx="iup${i}">↑</button><button data-lx="idn${i}">↓</button><button data-lx="idup${i}">Dupliquer</button><button data-lx="idel${i}">Supprimer</button></div>`}).join('');
+  return `<div class="box card"><input type="text" value="${E(it.n)}" ${a('n')} style="width:110px"> ${sel('kind',ITEM_KINDS)} ${sel('at',ITEM_AT)} ${n('len','Longueur')} ${n('w','Épaisseur')} ${n('rot','Rotation °')} ${n('ox','Décalage X')} ${n('oy','Décalage Y')} ${n('glow','Lueur')} ${n('spin','Tourne (°/s)')} ${sel('when',ITEM_WHEN)} ${mvUI(it,i)} <input type="color" value="${it.color||'#cccccc'}" ${a('color')}> <input type="color" value="${it.color2||'#8a5a2b'}" ${a('color2')}> ${it.kind==='image'?`<input type="file" accept="image/*" data-iimg="${i}" style="width:150px">${it.img?` <span style="display:inline-flex;align-items:center;gap:6px"><span style="position:relative;display:inline-block"><img src="${it.img}" data-ipick="${i}" style="height:64px;max-width:160px;cursor:crosshair;background:#10131f;border:1px solid #556;display:block"><i style="position:absolute;left:${it.px??15}%;top:${it.py??50}%;width:10px;height:10px;margin:-5px 0 0 -5px;border:2px solid #ff8c28;border-radius:50%;background:rgba(255,140,40,.35);pointer-events:none"></i></span><small>Clique sur l'image pour placer le centre (point d'attache et de rotation)</small> <label>Centre X % <input type="number" value="${it.px??15}" data-it="${i}" data-if="px" style="width:56px"></label> <label>Centre Y % <input type="number" value="${it.py??50}" data-it="${i}" data-if="py" style="width:56px"></label></span>`:''}`:''} <label><input type="checkbox" ${it.show===0?'':'checked'} ${a('show')}> visible</label> <button data-lx="iup${i}">↑</button><button data-lx="idn${i}">↓</button><button data-lx="idup${i}">Dupliquer</button><button data-lx="idel${i}">Supprimer</button></div>`}).join('');
  return h+`<small style="grid-column:1/-1">L'objet suit la main (ou la tête, le dos, le torse, la taille, un pied…) : les bras animés le font bouger. Les curseurs « Poignet » règlent son angle image par image. L'ordre de la liste = l'ordre d'affichage (le dernier est devant).</small>`}
 function bodyForm(){
  const b=CH.body,rg=(l,k,mn,mx,st)=>`<label>${l}<span><input type="range" min="${mn}" max="${mx}" step="${st||1}" value="${b[k]}" data-bd="${k}" style="width:140px"> <output>${b[k]}</output></span></label>`,
  sl=(l,k,list)=>sI(l,`data-bd="${k}"`,list,b[k]),d=bodyDims(b);
  return `<div class="box"><b>Modèles :</b> ${BODY_PRESETS.map(([n],i)=>`<button data-bp="${i}">${n}</button>`).join(' ')}</div>`
+ +`<div class="box card"><label><input type="checkbox" data-bk="mc" ${b.mc?'checked':''}> <b>Modèle Minecraft</b> (corps en blocs)</label>${b.mc?` <label>Skin (PNG 64×64 ou 64×32) <input type="file" accept="image/png" data-skin="1" style="width:190px"></label> <span>${b.skin?'✔ skin chargé':'skin par défaut'}</span> ${b.skin?'<button data-lx="skinclr">Retirer le skin</button>':''} ${sl('Tête','mcHead',MC_HEADS)} <label><input type="checkbox" data-bk="mcLayer" ${b.mcLayer===0?'':'checked'}> 2ᵉ couche (chapeau, manches, veste)</label>`:' <small>Active-le (ou clique « Minecraft (joueur) » dans les modèles) pour pouvoir mettre un skin.</small>'}</div>`
  +rg('Taille générale (×)','scale',.4,2.5,.05)
  +rg('Tête : taille','headR',4,26)+sl('Tête : forme','headShape',HEAD_SHAPES)+sl('Tête : décoration','headDeco',HEAD_DECOS)+sl('Yeux','eyes',EYES)
  +rg('Torse : longueur','torL',8,44)+rg('Torse : épaisseur','torW',4,40)+sl('Torse : forme','torShape',TORSO_SHAPES)
@@ -156,7 +158,9 @@ function form(){
  f.innerHTML=h}
 $('form').addEventListener('toggle',e=>{const s=e.target.dataset&&e.target.dataset.sec;if(s){if(e.target.open)OPEN.add(s);else OPEN.delete(s)}},true);
 $('form').oninput=e=>{const t=e.target,d=t.dataset,m=(NOM()||cur==='_i')?null:M();
- if(d.bd){const k=d.bd;CH.body[k]=['headShape','headDeco','eyes','torShape','color','headColor'].includes(k)?t.value:+t.value;
+ if(d.bk){CH.body[d.bk]=t.checked?1:0;form();save();draw();return}
+ if(d.skin!==undefined){pickImg(t.files[0],512,u=>{CH.body.skin=u;if(!CH.body.mc)Object.assign(CH.body,BODY_PRESETS.find(p=>p[1].mc)[1]);form()});return}
+ if(d.bd){const k=d.bd;CH.body[k]=['headShape','headDeco','eyes','torShape','color','headColor','mcHead'].includes(k)?t.value:+t.value;
   if(t.type==='color'){const c=document.querySelector('[data-bdc="'+k+'"]');if(c)c.checked=true}
   const o=t.parentNode.querySelector('output');if(o)o.textContent=t.value;save();draw();if(k==='scale'||k==='headR'||k==='torW'||k==='legL'||k==='torL')form();return}
  if(d.bdc){const k=d.bdc,c=document.querySelector('[data-bd="'+k+'"]');CH.body[k]=t.checked?c.value:'';save();draw();return}
@@ -182,7 +186,9 @@ $('form').oninput=e=>{const t=e.target,d=t.dataset,m=(NOM()||cur==='_i')?null:M(
   else if(t.value===''&&!['s','a','e','d','kb','gr','ang'].includes(f))delete m[f];else m[f]=+t.value||0}
  save();draw()};
 $('form').onclick=e=>{const dd=e.target.dataset,l=dd.lx;
- if(dd.bp!==undefined){CH.body=Object.assign({},BODY_DEFAULT,BODY_PRESETS[+dd.bp][1]);form();save();draw();return}
+ if(dd.ipick!==undefined){const it=CH.items[+dd.ipick],r=e.target.getBoundingClientRect();it.px=Math.max(0,Math.min(100,Math.round((e.clientX-r.left)/r.width*100)));it.py=Math.max(0,Math.min(100,Math.round((e.clientY-r.top)/r.height*100)));form();save();draw();return}
+ if(l==='skinclr'){CH.body.skin='';form();save();draw();return}
+ if(dd.bp!==undefined){const sk=CH.body.skin,pr=BODY_PRESETS[+dd.bp][1];CH.body=Object.assign({},BODY_DEFAULT,pr);if(pr.mc&&sk)CH.body.skin=sk;form();save();draw();return}
  if(dd.ia!==undefined){CH.items.push(JSON.parse(JSON.stringify(ITEM_PRESETS[+dd.ia])));delete CH.items[CH.items.length-1].g;form();save();draw();return}
  if(l===undefined)return;
  if(l.startsWith('idel')){CH.items.splice(+l.slice(4),1);form();save();draw();return}
